@@ -5,7 +5,7 @@ struct TextFileHeader {
     _text_sections: u16,
     line_count: u16,
     _total_length: u32,
-    _intial_key: u32,
+    _initial_key: u32,
     section_data_offset: u32,
     _section_length: u32,
 }
@@ -35,7 +35,7 @@ impl EncryptedLine {
                     '\u{E08E}' => Some('M'),
                     '\u{E08F}' => Some('F'),
                     'é' => Some('e'),
-                    c => Some(c)
+                    c => Some(c),
                 }
             })
             .collect();
@@ -72,13 +72,15 @@ impl BinRead for TextFile {
                 line_info.offset as u64 + header.section_data_offset as u64,
             ))?;
             lines.push(
-                EncryptedLine::read_options(reader, endian, (line_info.length,))?
-                    .into_string(key),
+                EncryptedLine::read_options(reader, endian, (line_info.length,))?.into_string(key),
             );
             reader.seek(std::io::SeekFrom::Start(pos))?;
             key = key.wrapping_add(KEY_ADVANCE);
         }
 
-        Ok(TextFile { _header: header, lines })
+        Ok(TextFile {
+            _header: header,
+            lines,
+        })
     }
 }

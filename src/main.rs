@@ -1,4 +1,10 @@
-use std::{env, fs::File, io::Write, path::Path};
+use std::{
+    env,
+    ffi::OsStr,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 
 use binrw::BinRead;
 use color_eyre::Result;
@@ -18,9 +24,6 @@ mod pokemon;
 mod text_ids {
     pub const SPECIES_NAMES: usize = 60;
 
-    pub const ITEM_NAMES: usize = 40;
-    pub const _ITEM_DESCS: usize = 39;
-
     pub const ABILITY_NAMES: usize = 101;
     pub const ABILITY_DESCS: usize = 102;
 
@@ -38,7 +41,6 @@ mod garc_files {
     pub const LVL_UP_MOVES: &str = "0/1/3";
 
     pub const EVOLUTIONS: &str = "0/1/4";
-    pub const MEGA_EVOS: &str = "0/1/5";
 
     pub const POKEMON_STATS: &str = "0/1/7";
 }
@@ -94,7 +96,6 @@ struct AbilityJs {
     name: String,
     num: u32,
     desc: String,
-    shortDesc: String,
 }
 
 fn dump_abilities(_rom_path: &Path, out_path: &Path, text_files: &[TextFile]) -> Result<()> {
@@ -111,7 +112,6 @@ fn dump_abilities(_rom_path: &Path, out_path: &Path, text_files: &[TextFile]) ->
                     name: name.clone(),
                     num: index as _,
                     desc: ability_descs[index].clone(),
-                    shortDesc: ability_descs[index].clone(),
                 },
             )
         })
@@ -119,7 +119,7 @@ fn dump_abilities(_rom_path: &Path, out_path: &Path, text_files: &[TextFile]) ->
         .collect();
 
     let mut f = File::create(out_path.join("abilities.json"))?;
-    write!(f, "{}", serde_json::to_string_pretty(&ability_map)?)?;
+    write!(f, "{}", serde_json::to_string(&ability_map)?)?;
 
     Ok(())
 }
@@ -127,7 +127,16 @@ fn dump_abilities(_rom_path: &Path, out_path: &Path, text_files: &[TextFile]) ->
 fn main() {
     let args: Vec<String> = env::args().collect();
     let path = Path::new(&args[1]);
-    let out_path = Path::new(&args[2]);
+
+    let folder_name = path.file_name().unwrap_or(OsStr::new("output"));
+
+    let mut out_name = folder_name.to_string_lossy().into_owned();
+    out_name.push_str("_out");
+
+    let out_path_buf = PathBuf::from(out_name);
+    let out_path = out_path_buf.as_path();
+
+    std::fs::create_dir_all(out_path).unwrap();
 
     let mut en_text_file = File::open(path.join("romfs/a/0/3/2")).unwrap();
     let text_garc_file = GarcFile::read_le(&mut en_text_file).unwrap();

@@ -86,7 +86,7 @@ pub fn dump_learnsets(
         .collect();
     manual_patches(&mut learnset_map);
     let mut f = File::create(out_path.join("learnsets.json"))?;
-    write!(f, "{}", serde_json::to_string_pretty(&learnset_map)?)?;
+    write!(f, "{}", serde_json::to_string(&learnset_map)?)?;
     Ok(())
 }
 

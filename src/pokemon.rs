@@ -2,9 +2,9 @@ use crate::{
     garc::{self, GarcFile},
     garc_files,
     text::TextFile,
-    text_ids, to_id, PokemonStats, Stats,
+    text_ids, to_id, PokemonStats,
 };
-use binrw::{until_eof, BinRead};
+use binrw::BinRead;
 use color_eyre::Result;
 use indexmap::{IndexMap, IndexSet};
 use serde::Serialize;
@@ -29,19 +29,6 @@ struct PokemonMegaEvolution {
     _unused: u16,
 }
 
-#[derive(BinRead, Debug)]
-struct PokemonMegaEvolutions {
-    #[br(parse_with = until_eof)]
-    mega_evos: Vec<PokemonMegaEvolution>,
-}
-
-#[allow(non_snake_case)]
-#[derive(Serialize, Debug)]
-struct PokemonJsGenderRatio {
-    M: f32,
-    F: f32,
-}
-
 #[allow(non_snake_case)]
 #[serde_with::skip_serializing_none]
 #[derive(Serialize, Debug)]
@@ -49,24 +36,15 @@ struct PokemonJs {
     num: u32,
     name: String,
     types: Vec<String>,
-    gender: Option<String>,
-    genderRatio: Option<PokemonJsGenderRatio>,
-    baseStats: Stats,
-    abilities: BTreeMap<String, String>,
-    weightkg: f32,
+    baseStats: [u8; 6],
+    abilities: Vec<String>,
+    weight: f32,
 
     prevo: Option<String>,
-    evoLevel: Option<u16>,
-    evoType: Option<String>,
-    evoItem: Option<String>,
-    evoCondition: Option<String>,
     evos: Option<Vec<String>>,
-    eggGroups: Vec<String>,
 
     baseSpecies: Option<String>,
-    forme: Option<String>,
-    formes: Option<Vec<String>>,
-    requiredItems: Option<Vec<String>>,
+    form: Option<String>,
 
     unusable: Option<bool>,
 }
@@ -331,8 +309,6 @@ pub fn dump_pokes(
     let species_names = &text_files[text_ids::SPECIES_NAMES].lines;
     let ability_names = &text_files[text_ids::ABILITY_NAMES].lines;
     let type_names = &text_files[text_ids::TYPE_NAMES].lines;
-    let item_names = &text_files[text_ids::ITEM_NAMES].lines;
-    let move_names = &text_files[text_ids::MOVE_NAMES].lines;
 
     for (index, pokemon) in pokemons.iter().take(NORMAL_FORME_COUNT).enumerate() {
         let name = &species_names[index];
@@ -356,19 +332,9 @@ pub fn dump_pokes(
             let pokemon_forme = &pokemons[index];
             let mut poke = make_poke(pokemon_forme, type_names, ability_names, index, &name);
             poke.num = base_index as _;
-            poke.forme = Some(forme_name.to_owned());
+            poke.form = Some(forme_name.to_owned());
             poke.baseSpecies = Some(base_name.clone());
             dex_map.insert(index, poke);
-        }
-
-        if let Some(dex) = dex_map.get_mut(&base_index) {
-            dex.formes = Some(formes.clone())
-        }
-        for form_id in 1..pokemon.form_count {
-            let index = pokemon.form_stats_id as usize + form_id as usize - 1;
-            if let Some(dex) = dex_map.get_mut(&index) {
-                dex.formes = Some(formes.clone());
-            }
         }
     }
 
@@ -377,15 +343,7 @@ pub fn dump_pokes(
         .join(garc_files::EVOLUTIONS);
     let evolutions =
         garc::read_files::<[PokemonEvolution; 8]>(&GarcFile::read_le(&mut File::open(evo_path)?)?);
-    handle_evos(evolutions, item_names, move_names, &mut dex_map, &pokemons);
-
-    let mega_evo_path = rom_path
-        .join(garc_files::BASE_PATH)
-        .join(garc_files::MEGA_EVOS);
-    let mega_evos = garc::read_files::<PokemonMegaEvolutions>(&GarcFile::read_le(
-        &mut File::open(mega_evo_path)?,
-    )?);
-    handle_mega_evos(mega_evos, item_names, &mut dex_map, &pokemons);
+    handle_evos(evolutions, &mut dex_map, &pokemons);
 
     let name_map = dex_map.iter().map(|(i, s)| (*i, s.name.clone())).collect();
 
@@ -399,28 +357,9 @@ pub fn dump_pokes(
     manual_patches(&mut dex_map);
 
     let mut f = File::create(out_path.join("pokedex.json"))?;
-    write!(f, "{}", serde_json::to_string_pretty(&dex_map)?)?;
+    write!(f, "{}", serde_json::to_string(&dex_map)?)?;
     Ok(name_map)
 }
-
-const EGG_GROUPS: &[&str] = &[
-    "---",
-    "Monster",
-    "Water 1",
-    "Bug",
-    "Flying",
-    "Field",
-    "Fairy",
-    "Grass",
-    "Human-Like",
-    "Water 3",
-    "Mineral",
-    "Amorphous",
-    "Water 2",
-    "Ditto",
-    "Dragon",
-    "Undiscovered",
-];
 
 fn make_poke(
     pokemon: &PokemonStats,
@@ -435,75 +374,42 @@ fn make_poke(
         .collect();
     types.dedup();
 
-    let mut abilities = BTreeMap::new();
-    abilities.insert(
-        "0".to_owned(),
-        ability_names[pokemon.abilities[0] as usize].clone(),
-    );
+    let mut abilities = Vec::new();
+    abilities.push(ability_names[pokemon.abilities[0] as usize].clone());
     if pokemon.abilities[1] != pokemon.abilities[0] {
-        abilities.insert(
-            "1".to_owned(),
-            ability_names[pokemon.abilities[1] as usize].clone(),
-        );
+        abilities.push(ability_names[pokemon.abilities[1] as usize].clone());
     }
     if pokemon.abilities[2] != pokemon.abilities[0]
         && pokemon.abilities[2] != pokemon.abilities[1]
         && pokemon.abilities[2] != 255
     {
-        abilities.insert(
-            "H".to_owned(),
-            ability_names[pokemon.abilities[2] as usize].clone(),
-        );
+        abilities.push(ability_names[pokemon.abilities[2] as usize].clone());
     }
-
-    let mut egg_groups: Vec<String> = pokemon
-        .egg_groups
-        .iter()
-        .map(|id| EGG_GROUPS[*id as usize].to_owned())
-        .collect();
-    egg_groups.dedup();
-
-    let (gender, gender_ratio) = match pokemon.gender {
-        0 => (Some("M".to_owned()), None),
-        254 => (Some("F".to_owned()), None),
-        255 => (Some("N".to_owned()), None),
-        g => (
-            None,
-            Some(PokemonJsGenderRatio {
-                M: (256. - (g + 1) as f32) / 256.,
-                F: ((g + 1) as f32 / 256.),
-            }),
-        ),
-    };
 
     PokemonJs {
         num: index as _,
         name: name.to_owned(),
         types,
-        gender,
-        genderRatio: gender_ratio,
-        baseStats: pokemon.stats.clone(),
+        baseStats: [
+            pokemon.stats.hp,
+            pokemon.stats.atk,
+            pokemon.stats.def,
+            pokemon.stats.spa,
+            pokemon.stats.spd,
+            pokemon.stats.spe,
+        ],
         abilities,
-        weightkg: pokemon.weight as f32 / 10.,
+        weight: pokemon.weight as f32 / 10.,
         prevo: None,
-        evoType: None,
-        evoLevel: None,
-        evoItem: None,
-        evoCondition: None,
         evos: None,
-        eggGroups: egg_groups,
         baseSpecies: None,
-        forme: None,
-        formes: None,
-        requiredItems: None,
+        form: None,
         unusable: None,
     }
 }
 
 fn handle_evos(
     evolutions: Vec<[PokemonEvolution; 8]>,
-    item_names: &[String],
-    move_names: &[String],
     dex_map: &mut BTreeMap<usize, PokemonJs>,
     pokemons: &[PokemonStats],
 ) {
@@ -528,93 +434,9 @@ fn handle_evos(
             let evo_name = &poke_entry.name;
             evo_set.insert(evo_name.clone());
             poke_entry.prevo = Some(current_name.clone());
-
-            if evo.level > 0 {
-                poke_entry.evoLevel = Some(evo.level as _);
-            }
-
-            match evo.method {
-                1 => poke_entry.evoType = Some("levelFriendship".to_owned()),
-                2 => {
-                    poke_entry.evoType = Some("levelFriendship".to_owned());
-                    poke_entry.evoCondition = Some("during the day".to_owned());
-                }
-                3 => {
-                    poke_entry.evoType = Some("levelFriendship".to_owned());
-                    poke_entry.evoCondition = Some("during the night".to_owned());
-                }
-                5 => {
-                    poke_entry.evoType = Some("trade".to_owned());
-                }
-                6 => {
-                    poke_entry.evoType = Some("trade".to_owned());
-                    poke_entry.evoItem = Some(item_names[evo.argument as usize].clone());
-                }
-                8 => {
-                    poke_entry.evoType = Some("useItem".to_owned());
-                    poke_entry.evoItem = Some(item_names[evo.argument as usize].clone());
-                }
-                17 => {
-                    poke_entry.evoType = Some("useItem".to_owned());
-                    poke_entry.evoItem = Some(item_names[evo.argument as usize].clone());
-                    poke_entry.evoCondition = Some("on male".to_owned());
-                }
-                18 => {
-                    poke_entry.evoType = Some("useItem".to_owned());
-                    poke_entry.evoItem = Some(item_names[evo.argument as usize].clone());
-                    poke_entry.evoCondition = Some("on female".to_owned());
-                }
-                19 => {
-                    poke_entry.evoType = Some("levelHold".to_owned());
-                    poke_entry.evoItem = Some(item_names[evo.argument as usize].clone());
-                    if poke_entry.evoCondition == Some("in the night".to_owned()) {
-                        poke_entry.evoCondition = None;
-                    } else {
-                        poke_entry.evoCondition = Some("in the day".to_owned());
-                    }
-                }
-                20 => {
-                    poke_entry.evoType = Some("levelHold".to_owned());
-                    poke_entry.evoItem = Some(item_names[evo.argument as usize].clone());
-                    if poke_entry.evoCondition == Some("in the day".to_owned()) {
-                        poke_entry.evoCondition = None;
-                    } else {
-                        poke_entry.evoCondition = Some("in the night".to_owned());
-                    }
-                }
-                21 => {
-                    poke_entry.evoType = Some("other".to_owned());
-                    poke_entry.evoCondition = Some(format!("level-up with {}", move_names[evo.argument as usize].clone()));
-                }
-
-                _ => {}
-            }
         }
         if !evo_set.is_empty() {
             dex_map.get_mut(&index).unwrap().evos = Some(evo_set.into_iter().collect());
-        }
-    }
-}
-
-fn handle_mega_evos(
-    mega_evos_list: Vec<PokemonMegaEvolutions>,
-    item_names: &[String],
-    dex_map: &mut BTreeMap<usize, PokemonJs>,
-    pokemons: &[PokemonStats],
-) {
-    for (index, mega_evos) in mega_evos_list.iter().enumerate() {
-        let base_poke = &pokemons[index];
-        for mega_evo in &mega_evos.mega_evos {
-            if mega_evo.method != 1 {
-                continue;
-            }
-            let new_forme_id = (base_poke.form_stats_id + mega_evo.forme - 1) as usize;
-            let Some(new_forme) = dex_map.get_mut(&new_forme_id) else {
-                continue;
-            };
-            let mut required_items = new_forme.requiredItems.clone().unwrap_or_default();
-            required_items.push(item_names[mega_evo.argument as usize].clone());
-            new_forme.requiredItems = Some(required_items);
         }
     }
 }
@@ -657,30 +479,10 @@ fn manual_patches(dex_map: &mut IndexMap<String, PokemonJs>) {
     }
 
     for remove in REMOVE {
-        let Some(entry) = dex_map.get_mut(*remove) else {
-            continue;
-        };
-        let new_formes: Vec<String> = entry
-            .formes
-            .as_ref()
-            .unwrap()
-            .iter()
-            .filter(|f| to_id((*f).clone()) != *remove)
-            .cloned()
-            .collect();
-        for n in &new_formes {
-            let Some(entry) = dex_map.get_mut(&to_id(n.clone())) else {
-                continue;
-            };
-            entry.formes = Some(new_formes.clone());
-        }
         dex_map.shift_remove(*remove);
     }
 
     if let Some(porygon_2) = dex_map.get_mut("porygon2") {
         porygon_2.prevo = Some("Porygon".to_owned());
-        porygon_2.evoLevel = None;
-        porygon_2.evoType = Some("other".to_owned());
-        porygon_2.evoCondition = Some("level 35) or Porygon-Z (level-up holding Hotfix at level 40".to_owned());
     }
 }
