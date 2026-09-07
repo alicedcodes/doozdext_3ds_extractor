@@ -37,7 +37,6 @@ mod garc_files {
     pub const BASE_PATH: &str = "romfs/a/";
 
     pub const MOVE: &str = "0/1/1";
-    pub const _EGG_MOVES: &str = "0/1/2";
     pub const LVL_UP_MOVES: &str = "0/1/3";
 
     pub const EVOLUTIONS: &str = "0/1/4";

@@ -31,7 +31,6 @@ enum Method {
     lvl,
     tm,
     tutor,
-    _egg,
 }
 
 #[serde_with::skip_serializing_none]
