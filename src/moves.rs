@@ -83,7 +83,7 @@ struct MoveJs {
     name: String,
     pp: u32,
     priority: i32,
-    critRatio: i32,
+    crit: i32,
     r#type: String,
     target: String,
     desc: String,
