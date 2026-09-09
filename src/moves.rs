@@ -136,7 +136,7 @@ pub fn dump_moves(rom_path: &Path, out_path: &Path, text_files: &[TextFile]) -> 
                     }
                     .to_owned(),
                     priority: cmove.priority as _,
-                    critRatio: (cmove.crit_stage as i32) + 1,
+                    crit: (cmove.crit_stage as i32) + 1,
                     r#type: type_names[cmove.move_type as usize].clone(),
                     target: match cmove.target {
                         1 | 2 => "adjacentAlly",
