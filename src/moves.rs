@@ -77,8 +77,8 @@ enum MoveJsMultihit {
 #[derive(Serialize)]
 struct MoveJs {
     num: u32,
-    accuracy: MoveJsAccuracy,
-    basePower: u32,
+    acc: MoveJsAccuracy,
+    power: u32,
     category: String,
     name: String,
     pp: u32,
@@ -89,7 +89,7 @@ struct MoveJs {
     desc: String,
 
     multihit: Option<MoveJsMultihit>,
-    zMovePower: Option<i32>,
+    zPower: Option<i32>,
 }
 
 fn get_multihit(move_stats: &MoveStats) -> Option<MoveJsMultihit> {
@@ -123,11 +123,11 @@ pub fn dump_moves(rom_path: &Path, out_path: &Path, text_files: &[TextFile]) -> 
                 MoveJs {
                     num: index as _,
                     name: name.clone(),
-                    accuracy: match cmove.accuracy {
+                    acc: match cmove.accuracy {
                         101 => MoveJsAccuracy::Boolean(true),
                         a => MoveJsAccuracy::Number(a as _),
                     },
-                    basePower: cmove.power as _,
+                    power: cmove.power as _,
                     pp: cmove.pp as _,
                     category: match cmove.category {
                         1 => "Physical",
@@ -148,7 +148,7 @@ pub fn dump_moves(rom_path: &Path, out_path: &Path, text_files: &[TextFile]) -> 
                     }
                     .to_owned(),
                     multihit: get_multihit(cmove),
-                    zMovePower: Some(cmove.z_power as i32),
+                    zPower: Some(cmove.z_power as i32),
                     desc: move_descs[index].clone(),
                 },
             )
