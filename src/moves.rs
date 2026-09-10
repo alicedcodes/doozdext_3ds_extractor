@@ -62,7 +62,6 @@ struct BinLinkedMoves {
 #[serde(untagged)]
 enum MoveJsAccuracy {
     Number(i32),
-    Boolean(bool),
 }
 
 #[derive(Serialize)]
@@ -123,10 +122,7 @@ pub fn dump_moves(rom_path: &Path, out_path: &Path, text_files: &[TextFile]) -> 
                 MoveJs {
                     num: index as _,
                     name: name.clone(),
-                    acc: match cmove.accuracy {
-                        101 => MoveJsAccuracy::Boolean(true),
-                        a => MoveJsAccuracy::Number(a as _),
-                    },
+                    acc: MoveJsAccuracy::Number(cmove.accuracy as _),
                     power: cmove.power as _,
                     pp: cmove.pp as _,
                     category: match cmove.category {
