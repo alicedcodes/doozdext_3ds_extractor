@@ -28,7 +28,6 @@ struct LevelUpMoves {
 #[allow(non_camel_case_types)]
 #[derive(Serialize)]
 enum Method {
-    lvl,
     tm,
     tutor,
 }
@@ -38,7 +37,7 @@ enum Method {
 struct LearnsetEntry {
     #[serde[rename = "move"]]
     move_: String,
-    how: Method,
+    how: Option<Method>,
     level: Option<i16>,
 }
 
@@ -97,7 +96,7 @@ fn make_lvl_up_learnset(lvl_ups: &LevelUpMoves, move_names: &[String]) -> Learns
             .take_while(|lvl_up| lvl_up.move_id > 0)
             .map(|lvl_up| LearnsetEntry {
                 move_: to_id(move_names[lvl_up.move_id as usize].to_owned()),
-                how: Method::lvl,
+                how: None,
                 level: Some(lvl_up.level),
             })
             .collect(),
@@ -221,7 +220,7 @@ fn make_tm_learnset(pokemon: &PokemonStats, _move_names: &[String]) -> Learnset 
             .filter_map(|(index, name)| match check_bit(&pokemon.tm_bits, index) {
                 true => Some(LearnsetEntry {
                     move_: to_id(name.to_string()),
-                    how: Method::tm,
+                    how: Some(Method::tm),
                     level: None,
                 }),
                 false => None,
@@ -247,7 +246,7 @@ fn make_beach_learnset(pokemon: &PokemonStats, move_names: &[String]) -> Learnse
                 |(index, move_id)| match check_bit(&pokemon.beach_bits, index) {
                     true => Some(LearnsetEntry {
                         move_: to_id(move_names[*move_id as usize].to_owned()),
-                        how: Method::tutor,
+                        how: Some(Method::tutor),
                         level: None,
                     }),
                     false => None,
@@ -267,7 +266,7 @@ fn make_tutor_learnset(pokemon: &PokemonStats, move_names: &[String]) -> Learnse
                 |(index, move_id)| match check_bit(&pokemon.tutor_bits, index) {
                     true => Some(LearnsetEntry {
                         move_: to_id(move_names[*move_id as usize].to_owned()),
-                        how: Method::tutor,
+                        how: Some(Method::tutor),
                         level: None,
                     }),
                     false => None,
