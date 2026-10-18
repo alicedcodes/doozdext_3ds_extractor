@@ -246,7 +246,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "doozdext_data_extractor"
+name = "doozdext_3ds_extractor"
 version = "0.1.0"
 dependencies = [
  "binrw",
