@@ -1,14 +1,12 @@
 [package]
-name = "usum-extractor"
+name = "doozdext_3ds_extractor"
 version = "0.1.0"
-edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2024"
 
 [dependencies]
-binrw = "0.11.1"
-color-eyre = "0.6.2"
-indexmap = { version = "1.9.3", features = ["serde"] }
-serde = {version = "1.0.159", features = ["derive"]}
-serde_json = {version = "1.0.95", features = ["preserve_order"]}
-serde_with = "2.3.1"
+binrw = "0.15.2"
+color-eyre = "0.6.5"
+indexmap = { version = "2.14.2", features = ["serde"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
+serde_with = "3.24.0"

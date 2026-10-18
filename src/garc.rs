@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use binrw::BinRead;
 
-#[derive(BinRead, Debug)]
+#[derive(BinRead)]
 #[br(magic = b"CRAG")]
 struct GarcHeader {
     _header_size: u32,
@@ -11,12 +11,11 @@ struct GarcHeader {
     _chunk_count: u32,
     _data_offset: u32,
     _file_size: u32,
-
     #[br(pad_before = _header_size - 0x18)]
     _end: (),
 }
 
-#[derive(BinRead, Debug)]
+#[derive(BinRead)]
 #[br(magic = b"OTAF")]
 struct FileAllocationTableOffsets {
     _header_size: u32,
@@ -25,14 +24,13 @@ struct FileAllocationTableOffsets {
     _entries: Vec<u32>,
 }
 
-#[derive(BinRead, Debug, Clone, Copy)]
+#[derive(BinRead, Clone, Copy)]
 struct FileSubEntry {
     start: u32,
     end: u32,
     _length: u32,
 }
 
-#[derive(Debug)]
 struct FileEntry {
     _entry_bits: u32,
     entries: [Option<FileSubEntry>; 32],
@@ -60,17 +58,16 @@ impl BinRead for FileEntry {
     }
 }
 
-#[derive(BinRead, Debug)]
-#[br(magic = b"BTAF")]
+#[derive(BinRead)]
+#[br(magic = br"BTAF")]
 struct FileAllocationTableBits {
     _header_size: u32,
     _file_count: u32,
-
-    #[br(count = _file_count)]
+    #[br(count=_file_count)]
     file_entries: Vec<FileEntry>,
 }
 
-#[derive(BinRead, Debug)]
+#[derive(BinRead)]
 #[br(magic = b"BMIF")]
 struct FileImageBytes {
     _header_size: u32,
@@ -79,21 +76,12 @@ struct FileImageBytes {
     data: Vec<u8>,
 }
 
-#[derive(BinRead, Debug)]
+#[derive(BinRead)]
 pub struct GarcFile {
     _header: GarcHeader,
     _fato: FileAllocationTableOffsets,
     fatb: FileAllocationTableBits,
     fimb: FileImageBytes,
-}
-
-pub fn _read_file<T: BinRead>(file: usize, subfile: usize, garc: &GarcFile) -> Option<T>
-where
-    for<'a> <T as binrw::BinRead>::Args<'a>: std::default::Default,
-{
-    let file_entry = garc.fatb.file_entries[file].entries[subfile]?;
-    let file_bytes = &garc.fimb.data[file_entry.start as usize..file_entry.end as usize];
-    T::read_le(&mut Cursor::new(file_bytes)).ok()
 }
 
 pub fn read_files<T: BinRead>(garc: &GarcFile) -> Vec<T>

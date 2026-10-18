@@ -1,25 +1,13 @@
-use std::{
-    env,
-    ffi::OsStr,
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-};
-
+use crate::garc::GarcFile;
 use binrw::BinRead;
 use color_eyre::Result;
-use indexmap::IndexMap;
-use serde::Serialize;
-use text::TextFile;
-
-use crate::garc::GarcFile;
+use std::{env, fs::File, path::Path};
 
 mod garc;
-mod text;
-
 mod learnset;
 mod moves;
 mod pokemon;
+mod text;
 
 mod text_ids {
     pub const SPECIES_NAMES: usize = 60;
@@ -45,7 +33,7 @@ mod garc_files {
 }
 
 #[allow(dead_code)]
-#[derive(BinRead, Serialize, Debug, Clone)]
+#[derive(BinRead)]
 struct Stats {
     hp: u8,
     atk: u8,
@@ -54,8 +42,9 @@ struct Stats {
     spa: u8,
     spd: u8,
 }
+
 #[allow(dead_code)]
-#[derive(BinRead, Debug)]
+#[derive(BinRead)]
 struct PokemonStats {
     stats: Stats,
     types: (u8, u8),
@@ -89,59 +78,76 @@ fn to_id(s: String) -> String {
         .collect()
 }
 
-#[allow(non_snake_case)]
-#[derive(Serialize)]
-struct AbilityJs {
-    name: String,
-    num: u32,
-    desc: String,
-}
-
-fn dump_abilities(_rom_path: &Path, out_path: &Path, text_files: &[TextFile]) -> Result<()> {
+fn dump_abilities(_rom_path: &Path, out_path: &Path, text_files: &[text::TextFile]) -> Result<()> {
     let ability_names = &text_files[text_ids::ABILITY_NAMES].lines;
     let ability_descs = &text_files[text_ids::ABILITY_DESCS].lines;
 
-    let ability_map: IndexMap<String, AbilityJs> = ability_names
+    let abilities: Vec<(&str, String)> = ability_names
         .iter()
-        .enumerate()
-        .map(|(index, name)| {
-            (
-                to_id(name.clone()),
-                AbilityJs {
-                    name: name.clone(),
-                    num: index as _,
-                    desc: ability_descs[index].clone(),
-                },
-            )
-        })
+        .zip(ability_descs)
         .skip(1)
+        .map(|(name, desc)| (name.as_str(), desc.replace('\n', " ")))
         .collect();
 
-    let mut f = File::create(out_path.join("abilities.json"))?;
-    write!(f, "{}", serde_json::to_string(&ability_map)?)?;
-
+    std::fs::write(
+        out_path.join("abilities.json"),
+        serde_json::to_string(&abilities)?,
+    )?;
     Ok(())
 }
 
-fn main() {
+const TYPE_COUNT: usize = 18;
+
+fn read_type_chart(rom_path: &Path) -> Result<Vec<u8>> {
+    let code = std::fs::read(rom_path.join("exefs/code.bin"))?;
+
+    let mut sig = [4u8; TYPE_COUNT];
+    sig[5] = 2;
+    sig[7] = 0;
+    sig[8] = 2;
+
+    let start = code.windows(TYPE_COUNT).position(|w| w == sig).unwrap();
+
+    Ok(code[start..start + TYPE_COUNT * TYPE_COUNT].to_vec())
+}
+
+fn dump_types(rom_path: &Path, out_path: &Path, text_files: &[text::TextFile]) -> Result<()> {
+    let type_names = &text_files[text_ids::TYPE_NAMES].lines;
+    let type_chart = read_type_chart(rom_path)?;
+
+    let types: Vec<(&str, Vec<u8>)> = type_names
+        .iter()
+        .take(TYPE_COUNT)
+        .enumerate()
+        .map(|(defender, name)| {
+            let damage_taken = (0..TYPE_COUNT)
+                .map(|attacker| type_chart[attacker * TYPE_COUNT + defender] / 2)
+                .collect();
+            (name.as_str(), damage_taken)
+        })
+        .collect();
+
+    std::fs::write(out_path.join("types.json"), serde_json::to_string(&types)?)?;
+    Ok(())
+}
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
+
     let args: Vec<String> = env::args().collect();
-    let path = Path::new(&args[1]);
+    let rom_path = Path::new(&args[1]);
+    let out_path = Path::new(&args[2]);
+    std::fs::create_dir_all(out_path)?;
 
-    let folder_name = path.file_name().unwrap_or(OsStr::new("output"));
-
-    let mut out_name = folder_name.to_string_lossy().into_owned();
-    out_name.push_str("_out");
-
-    let out_path_buf = PathBuf::from(out_name);
-    let out_path = out_path_buf.as_path();
-
-    std::fs::create_dir_all(out_path).unwrap();
-
-    let mut en_text_file = File::open(path.join("romfs/a/0/3/2")).unwrap();
-    let text_garc_file = GarcFile::read_le(&mut en_text_file).unwrap();
+    let mut en_text_file = File::open(rom_path.join(garc_files::BASE_PATH).join("0/3/2"))?;
+    let text_garc_file = GarcFile::read_le(&mut en_text_file)?;
     let text_files = garc::read_files::<text::TextFile>(&text_garc_file);
-    let names = pokemon::dump_pokes(path, out_path, &text_files).unwrap();
-    learnset::dump_learnsets(path, out_path, &text_files, &names).unwrap();
-    moves::dump_moves(path, out_path, &text_files).unwrap();
-    dump_abilities(path, out_path, &text_files).unwrap();
+
+    let poke_names = pokemon::dump_pokes(&rom_path, &out_path, &text_files)?;
+    learnset::dump_learnsets(&rom_path, &out_path, &text_files, &poke_names)?;
+    moves::dump_moves(rom_path, out_path, &text_files)?;
+    dump_abilities(rom_path, out_path, &text_files)?;
+    dump_types(rom_path, out_path, &text_files)?;
+
+    Ok(())
 }
