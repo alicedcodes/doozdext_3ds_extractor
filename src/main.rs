@@ -1,7 +1,11 @@
 use crate::garc::GarcFile;
 use binrw::BinRead;
 use color_eyre::Result;
-use std::{env, fs::File, path::Path};
+use std::{
+    env,
+    fs::File,
+    path::{Path, PathBuf},
+};
 
 mod garc;
 mod learnset;
@@ -136,7 +140,21 @@ fn main() -> Result<()> {
 
     let args: Vec<String> = env::args().collect();
     let rom_path = Path::new(&args[1]);
-    let out_path = Path::new(&args[2]);
+
+    let default_out_path: PathBuf;
+
+    let out_path: &Path = if let Some(path_str) = args.get(2) {
+        Path::new(path_str)
+    } else {
+        let parent = rom_path.parent().unwrap_or_else(|| Path::new("."));
+        let file_name = rom_path.file_name().unwrap();
+        let mut out_name = file_name.to_string_lossy().into_owned();
+        out_name.push_str("_EXTRACTED_DATA");
+
+        default_out_path = parent.join(out_name);
+        &default_out_path
+    };
+
     std::fs::create_dir_all(out_path)?;
 
     let mut en_text_file = File::open(rom_path.join(garc_files::BASE_PATH).join("0/3/2"))?;
