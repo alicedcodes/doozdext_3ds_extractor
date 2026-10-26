@@ -164,11 +164,11 @@ fn main() -> Result<()> {
         "moves.json",
         "abilities.json",
         "types.json",
-        "icons.webp",
     ] {
         let _ = std::fs::remove_file(out_path.join(file));
     }
-    std::fs::create_dir_all(out_path)?;
+
+    let _ = std::fs::remove_dir_all(out_path.join("icons"));
 
     std::fs::create_dir_all(out_path)?;
 
@@ -178,10 +178,10 @@ fn main() -> Result<()> {
 
     let poke_names = pokemon::dump_pokes(&rom_path, &out_path, &text_files)?;
     learnset::dump_learnsets(&rom_path, &out_path, &text_files, &poke_names)?;
+    sprites::dump_icons(rom_path, out_path, &poke_names)?;
     moves::dump_moves(rom_path, out_path, &text_files)?;
     dump_abilities(rom_path, out_path, &text_files)?;
     dump_types(rom_path, out_path, &text_files)?;
-    sprites::dump_icons(rom_path, out_path)?;
 
     Ok(())
 }
