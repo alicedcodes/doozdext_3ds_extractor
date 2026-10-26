@@ -482,7 +482,7 @@ pub fn dump_icons(rom_path: &Path, out_path: &Path, poke_names: &[PokeEntry]) ->
         };
         imageops::crop_imm(img, x, y, ICON_W, ICON_H)
             .to_image()
-            .save(dir.join(format!("{}-{}.webp", poke.rom_index, poke.id)))?;
+            .save(dir.join(format!("{}.webp", poke.id)))?;
     }
 
     Ok(())
