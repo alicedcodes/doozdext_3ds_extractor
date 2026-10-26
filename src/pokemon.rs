@@ -31,6 +31,7 @@ struct PokemonEvolution {
 #[derive(Serialize)]
 struct PokemonJs {
     species: String,
+    id: usize,
     num: u32,
     form: Option<String>,
     types: Vec<u8>,
@@ -353,8 +354,12 @@ pub fn dump_pokes(
     sorted_dex_list.sort_by(|l, r| l.num.cmp(&r.num));
     let mut dex_map: IndexMap<String, PokemonJs> = sorted_dex_list
         .into_iter()
+        .enumerate()
         .skip(1)
-        .map(|dex| (dex.id(), dex))
+        .map(|(id, mut dex)| {
+            dex.id = id;
+            (dex.id(), dex)
+        })
         .collect();
     manual_patches(&mut dex_map);
 
@@ -387,6 +392,7 @@ fn make_poke(pokemon: &PokemonStats, index: usize, name: &str) -> PokemonJs {
 
     PokemonJs {
         species: name.to_owned(),
+        id: 0,
         num: index as _,
         form: None,
         types,

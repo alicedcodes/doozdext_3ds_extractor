@@ -64,14 +64,9 @@ pub fn dump_learnsets(
             .entry(to_id(name.clone()))
             .or_insert(index as u16 - 1);
     }
-    let tm_moves: Vec<u16> = TMS
+    let tm_moves: Vec<Option<u16>> = TMS
         .iter()
-        .map(|name| {
-            name_to_index
-                .get(&to_id(name.to_string()))
-                .copied()
-                .unwrap()
-        })
+        .map(|name| name_to_index.get(&to_id(name.to_string())).copied())
         .collect();
 
     let lvl_path = rom_path
@@ -101,12 +96,12 @@ pub fn dump_learnsets(
                     ))
                     .merge(make_bit_learnset(
                         &stats.beach_bits,
-                        BEACH_TUTORS.iter().map(|&id| id as u16 - 1),
+                        BEACH_TUTORS.iter().map(|&id| Some(id as u16 - 1)),
                         Method::tutor,
                     ))
                     .merge(make_bit_learnset(
                         &stats.tutor_bits,
-                        MOVE_TUTORS.iter().map(|&id| id as u16 - 1),
+                        MOVE_TUTORS.iter().map(|&id| Some(id as u16 - 1)),
                         Method::tutor,
                     )),
             )
@@ -140,12 +135,17 @@ fn check_bit(bits: &[u8], index: usize) -> bool {
     bits[index / 8] & (1 << (index % 8)) != 0
 }
 
-fn make_bit_learnset(bits: &[u8], moves: impl Iterator<Item = u16>, how: Method) -> Learnset {
+fn make_bit_learnset(
+    bits: &[u8],
+    moves: impl Iterator<Item = Option<u16>>,
+    how: Method,
+) -> Learnset {
     Learnset(
         moves
             .enumerate()
             .filter(|(index, _)| check_bit(bits, *index))
-            .map(|(_, move_)| LearnsetEntry(move_, LearnsetVariant::How(how)))
+            .filter_map(|(_, move_)| move_)
+            .map(|move_| LearnsetEntry(move_, LearnsetVariant::How(how)))
             .collect(),
     )
 }

@@ -11,6 +11,7 @@ mod garc;
 mod learnset;
 mod moves;
 mod pokemon;
+mod sprites;
 mod text;
 
 mod text_ids {
@@ -34,6 +35,8 @@ mod garc_files {
     pub const EVOLUTIONS: &str = "0/1/4";
 
     pub const POKEMON_STATS: &str = "0/1/7";
+
+    pub const ICONS: &str = "0/6/2";
 }
 
 #[allow(dead_code)]
@@ -155,6 +158,18 @@ fn main() -> Result<()> {
         &default_out_path
     };
 
+    for file in [
+        "pokedex.json",
+        "learnsets.json",
+        "moves.json",
+        "abilities.json",
+        "types.json",
+        "icons.webp",
+    ] {
+        let _ = std::fs::remove_file(out_path.join(file));
+    }
+    std::fs::create_dir_all(out_path)?;
+
     std::fs::create_dir_all(out_path)?;
 
     let mut en_text_file = File::open(rom_path.join(garc_files::BASE_PATH).join("0/3/2"))?;
@@ -166,6 +181,7 @@ fn main() -> Result<()> {
     moves::dump_moves(rom_path, out_path, &text_files)?;
     dump_abilities(rom_path, out_path, &text_files)?;
     dump_types(rom_path, out_path, &text_files)?;
+    sprites::dump_icons(rom_path, out_path)?;
 
     Ok(())
 }
