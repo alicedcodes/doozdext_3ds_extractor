@@ -68,7 +68,6 @@ enum MoveJsAccuracy {
 #[derive(Serialize)]
 struct MoveJs {
     name: String,
-    num: usize,
     r#type: u8,
     category: u8,
     power: u32,
@@ -94,7 +93,6 @@ pub fn dump_moves(rom_path: &Path, out_path: &Path, text_files: &[TextFile]) -> 
         .skip(1)
         .map(|(index, cmove)| MoveJs {
             name: move_names[index].clone(),
-            num: index,
             r#type: cmove.move_type,
             category: cmove.category,
             power: cmove.power as _,
