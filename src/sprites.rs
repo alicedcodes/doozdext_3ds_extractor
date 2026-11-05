@@ -441,7 +441,7 @@ fn sprite_index(pokemons: &[PokemonStats], species: usize, mut form: usize) -> u
     1 + before + form
 }
 
-pub fn dump_icons(rom_path: &Path, out_path: &Path, poke_names: &[PokeEntry]) -> Result<()> {
+pub fn dump_icons(rom_path: &Path, dir: &Path, poke_names: &[PokeEntry]) -> Result<()> {
     let base = rom_path.join(garc_files::BASE_PATH);
     let icons = garc::read_files::<Icon>(&GarcFile::read_le(&mut File::open(
         base.join(garc_files::ICONS),
@@ -454,8 +454,7 @@ pub fn dump_icons(rom_path: &Path, out_path: &Path, poke_names: &[PokeEntry]) ->
     let x = (64 - ICON_W) / 2;
     let y = (32 - ICON_H) / 2;
 
-    let dir = out_path.join("icons");
-    fs::create_dir_all(&dir)?;
+    fs::create_dir_all(dir)?;
 
     let mut used: Vec<usize> = Vec::new();
     for poke in poke_names {

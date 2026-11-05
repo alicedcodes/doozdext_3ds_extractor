@@ -5,7 +5,7 @@ use serde_json::json;
 use std::{
     env,
     fs::{self, File},
-    path::{Path, PathBuf},
+    path::Path,
 };
 
 mod garc;
@@ -139,44 +139,22 @@ fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let rom_path = Path::new(&args[1]);
 
-    let default_out_path: PathBuf;
-
-    let out_path: &Path = if let Some(path_str) = args.get(2) {
-        Path::new(path_str)
-    } else {
-        let parent = rom_path.parent().unwrap_or_else(|| Path::new("."));
-        let file_name = rom_path.file_name().unwrap();
-        let mut out_name = file_name.to_string_lossy().into_owned();
-        out_name.push_str("_EXTRACTED_DATA");
-
-        default_out_path = parent.join(out_name);
-        &default_out_path
+    let out_path: &Path = match args.get(2) {
+        Some(path_str) => Path::new(path_str),
+        None => rom_path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .unwrap_or_else(|| Path::new(".")),
     };
 
-    let data_file = format!(
-        "{}.json",
-        rom_path
-            .file_name()
-            .map_or_else(|| "data".into(), |n| n.to_string_lossy())
-    );
+    let name = rom_path
+        .file_name()
+        .map_or_else(|| "data".into(), |n| n.to_string_lossy());
+    let data_file = out_path.join(format!("{name}.json"));
+    let sprites_dir = out_path.join(format!("{name}_sprites"));
 
-    let _ = fs::remove_file(out_path.join(&data_file));
-    let _ = fs::remove_dir_all(out_path.join("icons"));
-
-    fs::create_dir_all(out_path)?;
-
-    for file in [
-        "pokedex.json",
-        "learnsets.json",
-        "moves.json",
-        "abilities.json",
-        "types.json",
-    ] {
-        let _ = fs::remove_file(out_path.join(file));
-    }
-
-    let _ = fs::remove_dir_all(out_path.join("icons"));
-
+    let _ = fs::remove_file(&data_file);
+    let _ = fs::remove_dir_all(&sprites_dir);
     fs::create_dir_all(out_path)?;
 
     let mut en_text_file = File::open(rom_path.join(garc_files::BASE_PATH).join("0/3/2"))?;
@@ -204,8 +182,8 @@ fn main() -> Result<()> {
         "abilities": abilities,
         "types": types,
     });
-    fs::write(out_path.join(&data_file), serde_json::to_string(&data)?)?;
+    fs::write(&data_file, serde_json::to_string(&data)?)?;
 
-    sprites::dump_icons(rom_path, out_path, &poke_names)?;
+    sprites::dump_icons(rom_path, &sprites_dir, &poke_names)?;
     Ok(())
 }
