@@ -8,7 +8,7 @@ use binrw::{BinRead, BinResult, Endian};
 use color_eyre::Result;
 use image::{Rgba, RgbaImage, imageops};
 use std::{
-    fs::File,
+    fs::{self, File},
     io::{Read, Seek},
     path::Path,
 };
@@ -455,7 +455,7 @@ pub fn dump_icons(rom_path: &Path, out_path: &Path, poke_names: &[PokeEntry]) ->
     let y = (32 - ICON_H) / 2;
 
     let dir = out_path.join("icons");
-    std::fs::create_dir_all(&dir)?;
+    fs::create_dir_all(&dir)?;
 
     let mut used: Vec<usize> = Vec::new();
     for poke in poke_names {

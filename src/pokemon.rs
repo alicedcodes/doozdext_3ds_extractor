@@ -29,7 +29,7 @@ struct PokemonEvolution {
 #[allow(non_snake_case)]
 #[serde_with::skip_serializing_none]
 #[derive(Serialize)]
-struct PokemonJs {
+pub struct PokemonJs {
     species: String,
     num: u32,
     form: Option<String>,
@@ -39,7 +39,7 @@ struct PokemonJs {
     prevo: Option<usize>,
     evos: Option<Vec<usize>>,
     #[serde(skip)]
-    index: usize,
+    pub index: usize,
 }
 
 impl PokemonJs {
@@ -303,11 +303,7 @@ fn get_form_name(species: &str, form_id: usize) -> Option<&'static str> {
     FORM_LOOKUP.get(&(species, form_id)).copied()
 }
 
-pub fn dump_pokes(
-    rom_path: &Path,
-    out_path: &Path,
-    text_files: &[TextFile],
-) -> Result<Vec<PokeEntry>> {
+pub fn dump_pokes(rom_path: &Path, text_files: &[TextFile]) -> Result<IndexMap<String, PokemonJs>> {
     const NORMAL_FORM_COUNT: usize = 808;
     let mut dex_map: BTreeMap<usize, PokemonJs> = BTreeMap::new();
 
@@ -350,25 +346,14 @@ pub fn dump_pokes(
     handle_evos(evolutions, &mut dex_map, &pokemons);
 
     let mut sorted_dex_list: Vec<_> = dex_map.into_values().collect();
-    sorted_dex_list.sort_by(|l, r| l.num.cmp(&r.num));
+    sorted_dex_list.sort_by_key(|a| a.num);
     let mut dex_map: IndexMap<String, PokemonJs> = sorted_dex_list
         .into_iter()
         .skip(1)
         .map(|dex| (dex.id(), dex))
         .collect();
     manual_patches(&mut dex_map);
-
-    std::fs::write(
-        out_path.join("pokedex.json"),
-        serde_json::to_string(&dex_map.values().collect::<Vec<_>>())?,
-    )?;
-    Ok(dex_map
-        .iter()
-        .map(|(id, p)| PokeEntry {
-            rom_index: p.index,
-            id: id.clone(),
-        })
-        .collect())
+    Ok(dex_map)
 }
 
 fn make_poke(pokemon: &PokemonStats, index: usize, name: &str) -> PokemonJs {
@@ -440,7 +425,7 @@ fn handle_evos(
 }
 
 pub const UNUSABLES: &[&str] = &[
-    "mewtwo",
+    // "mewtwo",
     "mewtwomegax",
     "mewtwomegay",
     "kyogre",

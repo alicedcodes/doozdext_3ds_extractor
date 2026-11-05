@@ -1,4 +1,6 @@
-use std::io::Cursor;
+use std::{default, io};
+
+use io::Cursor;
 
 use binrw::BinRead;
 
@@ -39,7 +41,7 @@ struct FileEntry {
 impl BinRead for FileEntry {
     type Args<'a> = ();
 
-    fn read_options<R: std::io::Read + std::io::Seek>(
+    fn read_options<R: io::Read + io::Seek>(
         reader: &mut R,
         endian: binrw::Endian,
         _args: Self::Args<'_>,
@@ -86,7 +88,7 @@ pub struct GarcFile {
 
 pub fn read_files<T: BinRead>(garc: &GarcFile) -> Vec<T>
 where
-    for<'a> <T as binrw::BinRead>::Args<'a>: std::default::Default,
+    for<'a> <T as binrw::BinRead>::Args<'a>: default::Default,
 {
     garc.fatb
         .file_entries

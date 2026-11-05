@@ -1,9 +1,7 @@
-use std::{fs::File, path::Path};
-
 use binrw::{BinRead, FilePtr};
 use color_eyre::Result;
 use serde::Serialize;
-use std::io::Write;
+use std::{fs::File, path::Path};
 
 use crate::{garc, garc_files, text::TextFile, text_ids};
 
@@ -66,7 +64,7 @@ enum MoveJsAccuracy {
 #[allow(non_snake_case)]
 #[serde_with::skip_serializing_none]
 #[derive(Serialize)]
-struct MoveJs {
+pub struct MoveJs {
     name: String,
     r#type: u8,
     category: u8,
@@ -77,7 +75,7 @@ struct MoveJs {
     desc: String,
 }
 
-pub fn dump_moves(rom_path: &Path, out_path: &Path, text_files: &[TextFile]) -> Result<()> {
+pub fn dump_moves(rom_path: &Path, text_files: &[TextFile]) -> Result<Vec<MoveJs>> {
     let move_names = &text_files[text_ids::MOVE_NAMES].lines;
     let move_descs = &text_files[text_ids::MOVE_DESCS].lines;
 
@@ -103,7 +101,5 @@ pub fn dump_moves(rom_path: &Path, out_path: &Path, text_files: &[TextFile]) -> 
         })
         .collect();
 
-    let mut f = File::create(out_path.join("moves.json"))?;
-    write!(f, "{}", serde_json::to_string(&move_list)?)?;
-    Ok(())
+    Ok(move_list)
 }

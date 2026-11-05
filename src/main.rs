@@ -1,9 +1,10 @@
-use crate::garc::GarcFile;
+use crate::{garc::GarcFile, pokemon::PokeEntry};
 use binrw::BinRead;
 use color_eyre::Result;
+use serde_json::json;
 use std::{
     env,
-    fs::File,
+    fs::{self, File},
     path::{Path, PathBuf},
 };
 
@@ -85,28 +86,22 @@ fn to_id(s: String) -> String {
         .collect()
 }
 
-fn dump_abilities(_rom_path: &Path, out_path: &Path, text_files: &[text::TextFile]) -> Result<()> {
+fn dump_abilities(text_files: &[text::TextFile]) -> Vec<(&str, String)> {
     let ability_names = &text_files[text_ids::ABILITY_NAMES].lines;
     let ability_descs = &text_files[text_ids::ABILITY_DESCS].lines;
 
-    let abilities: Vec<(&str, String)> = ability_names
+    ability_names
         .iter()
         .zip(ability_descs)
         .skip(1)
         .map(|(name, desc)| (name.as_str(), desc.replace('\n', " ")))
-        .collect();
-
-    std::fs::write(
-        out_path.join("abilities.json"),
-        serde_json::to_string(&abilities)?,
-    )?;
-    Ok(())
+        .collect()
 }
 
 const TYPE_COUNT: usize = 18;
 
 fn read_type_chart(rom_path: &Path) -> Result<Vec<u8>> {
-    let code = std::fs::read(rom_path.join("exefs/code.bin"))?;
+    let code = fs::read(rom_path.join("exefs/code.bin"))?;
 
     let mut sig = [4u8; TYPE_COUNT];
     sig[5] = 2;
@@ -118,11 +113,14 @@ fn read_type_chart(rom_path: &Path) -> Result<Vec<u8>> {
     Ok(code[start..start + TYPE_COUNT * TYPE_COUNT].to_vec())
 }
 
-fn dump_types(rom_path: &Path, out_path: &Path, text_files: &[text::TextFile]) -> Result<()> {
+fn dump_types<'a>(
+    rom_path: &Path,
+    text_files: &'a [text::TextFile],
+) -> Result<Vec<(&'a str, Vec<u8>)>> {
     let type_names = &text_files[text_ids::TYPE_NAMES].lines;
     let type_chart = read_type_chart(rom_path)?;
 
-    let types: Vec<(&str, Vec<u8>)> = type_names
+    Ok(type_names
         .iter()
         .take(TYPE_COUNT)
         .enumerate()
@@ -132,10 +130,7 @@ fn dump_types(rom_path: &Path, out_path: &Path, text_files: &[text::TextFile]) -
                 .collect();
             (name.as_str(), damage_taken)
         })
-        .collect();
-
-    std::fs::write(out_path.join("types.json"), serde_json::to_string(&types)?)?;
-    Ok(())
+        .collect())
 }
 
 fn main() -> Result<()> {
@@ -158,6 +153,18 @@ fn main() -> Result<()> {
         &default_out_path
     };
 
+    let data_file = format!(
+        "{}.json",
+        rom_path
+            .file_name()
+            .map_or_else(|| "data".into(), |n| n.to_string_lossy())
+    );
+
+    let _ = fs::remove_file(out_path.join(&data_file));
+    let _ = fs::remove_dir_all(out_path.join("icons"));
+
+    fs::create_dir_all(out_path)?;
+
     for file in [
         "pokedex.json",
         "learnsets.json",
@@ -165,23 +172,40 @@ fn main() -> Result<()> {
         "abilities.json",
         "types.json",
     ] {
-        let _ = std::fs::remove_file(out_path.join(file));
+        let _ = fs::remove_file(out_path.join(file));
     }
 
-    let _ = std::fs::remove_dir_all(out_path.join("icons"));
+    let _ = fs::remove_dir_all(out_path.join("icons"));
 
-    std::fs::create_dir_all(out_path)?;
+    fs::create_dir_all(out_path)?;
 
     let mut en_text_file = File::open(rom_path.join(garc_files::BASE_PATH).join("0/3/2"))?;
     let text_garc_file = GarcFile::read_le(&mut en_text_file)?;
     let text_files = garc::read_files::<text::TextFile>(&text_garc_file);
 
-    let poke_names = pokemon::dump_pokes(&rom_path, &out_path, &text_files)?;
-    learnset::dump_learnsets(&rom_path, &out_path, &text_files, &poke_names)?;
-    sprites::dump_icons(rom_path, out_path, &poke_names)?;
-    moves::dump_moves(rom_path, out_path, &text_files)?;
-    dump_abilities(rom_path, out_path, &text_files)?;
-    dump_types(rom_path, out_path, &text_files)?;
+    let dex_map = pokemon::dump_pokes(rom_path, &text_files)?;
+    let poke_names: Vec<PokeEntry> = dex_map
+        .iter()
+        .map(|(id, p)| PokeEntry {
+            rom_index: p.index,
+            id: id.clone(),
+        })
+        .collect();
 
+    let learnsets = learnset::dump_learnsets(rom_path, &text_files, &poke_names)?;
+    let moves = moves::dump_moves(rom_path, &text_files)?;
+    let abilities = dump_abilities(&text_files);
+    let types = dump_types(rom_path, &text_files)?;
+
+    let data = json!({
+        "pokedex": dex_map.values().collect::<Vec<_>>(),
+        "learnsets": learnsets,
+        "moves": moves,
+        "abilities": abilities,
+        "types": types,
+    });
+    fs::write(out_path.join(&data_file), serde_json::to_string(&data)?)?;
+
+    sprites::dump_icons(rom_path, out_path, &poke_names)?;
     Ok(())
 }

@@ -41,7 +41,7 @@ enum LearnsetVariant {
 pub struct LearnsetEntry(u16, LearnsetVariant);
 
 #[derive(Serialize)]
-struct Learnset(Vec<LearnsetEntry>);
+pub struct Learnset(Vec<LearnsetEntry>);
 
 impl Learnset {
     fn merge(mut self, mut other: Learnset) -> Self {
@@ -52,10 +52,9 @@ impl Learnset {
 
 pub fn dump_learnsets(
     rom_path: &Path,
-    out_path: &Path,
     text_files: &[TextFile],
     poke_names: &[PokeEntry],
-) -> Result<()> {
+) -> Result<Vec<Option<Learnset>>> {
     let move_names = &text_files[text_ids::MOVE_NAMES].lines;
 
     let mut name_to_index: HashMap<String, u16> = HashMap::new();
@@ -96,23 +95,19 @@ pub fn dump_learnsets(
                     ))
                     .merge(make_bit_learnset(
                         &stats.beach_bits,
-                        BEACH_TUTORS.iter().map(|&id| Some(id as u16 - 1)),
+                        BEACH_TUTORS.iter().map(|&id| Some(id - 1)),
                         Method::tutor,
                     ))
                     .merge(make_bit_learnset(
                         &stats.tutor_bits,
-                        MOVE_TUTORS.iter().map(|&id| Some(id as u16 - 1)),
+                        MOVE_TUTORS.iter().map(|&id| Some(id - 1)),
                         Method::tutor,
                     )),
             )
         })
         .collect();
 
-    std::fs::write(
-        out_path.join("learnsets.json"),
-        serde_json::to_string(&learnsets)?,
-    )?;
-    Ok(())
+    Ok(learnsets)
 }
 
 fn make_lvl_up_learnset(lvl_ups: &LevelUpMoves) -> Learnset {

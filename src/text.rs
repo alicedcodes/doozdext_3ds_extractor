@@ -1,4 +1,5 @@
 use binrw::BinRead;
+use std::io;
 
 #[derive(BinRead)]
 struct TextFileHeader {
@@ -29,7 +30,7 @@ impl EncryptedLine {
             .iter()
             .map_while(|u| {
                 let c = char::from_u32((*u ^ key) as u32).unwrap_or(' ');
-                key = key << 3 | key >> 13;
+                key = key.rotate_left(3);
                 match c {
                     '\0' => None,
                     '\u{E08E}' => Some('M'),
@@ -50,7 +51,7 @@ pub struct TextFile {
 impl BinRead for TextFile {
     type Args<'a> = ();
 
-    fn read_options<R: std::io::Read + std::io::Seek>(
+    fn read_options<R: io::Read + io::Seek>(
         reader: &mut R,
         endian: binrw::Endian,
         _args: Self::Args<'_>,
@@ -58,19 +59,17 @@ impl BinRead for TextFile {
         let header = TextFileHeader::read_options(reader, endian, ())?;
         let mut lines: Vec<String> = Vec::new();
         let mut key: u16 = 0x7c89;
-        reader.seek(std::io::SeekFrom::Start(
-            header.section_data_offset as u64 + 4,
-        ))?;
+        reader.seek(io::SeekFrom::Start(header.section_data_offset as u64 + 4))?;
         for _ in 0..header.line_count {
             let line_info = LineInfo::read_options(reader, endian, ())?;
             let pos = reader.stream_position()?;
-            reader.seek(std::io::SeekFrom::Start(
+            reader.seek(io::SeekFrom::Start(
                 line_info.offset as u64 + header.section_data_offset as u64,
             ))?;
             lines.push(
                 EncryptedLine::read_options(reader, endian, (line_info.length,))?.into_string(key),
             );
-            reader.seek(std::io::SeekFrom::Start(pos))?;
+            reader.seek(io::SeekFrom::Start(pos))?;
             key = key.wrapping_add(0x2983);
         }
 
