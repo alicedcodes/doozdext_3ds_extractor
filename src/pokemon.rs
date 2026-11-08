@@ -345,11 +345,10 @@ pub fn dump_pokes(rom_path: &Path, text_files: &[TextFile]) -> Result<IndexMap<S
         garc::read_files::<[PokemonEvolution; 8]>(&GarcFile::read_le(&mut File::open(evo_path)?)?);
     handle_evos(evolutions, &mut dex_map, &pokemons);
 
-    let mut sorted_dex_list: Vec<_> = dex_map.into_values().collect();
+    let mut sorted_dex_list: Vec<_> = dex_map.into_values().skip(1).collect();
     sorted_dex_list.sort_by_key(|a| a.num);
     let mut dex_map: IndexMap<String, PokemonJs> = sorted_dex_list
         .into_iter()
-        .skip(1)
         .map(|dex| (dex.id(), dex))
         .collect();
     manual_patches(&mut dex_map);
