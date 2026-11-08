@@ -441,8 +441,8 @@ pub const UNUSABLES: &[&str] = &[
     "xerneas",
     "yveltal",
     "zygardecomplete",
-    "necrozmadusk",
-    "necrozmadawn",
+    "necrozmaduskmane",
+    "necrozmadawnwings",
     "necrozmaultra",
 ];
 
