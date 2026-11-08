@@ -19,7 +19,6 @@ mod text_ids {
     pub const SPECIES_NAMES: usize = 60;
 
     pub const ABILITY_NAMES: usize = 101;
-    pub const ABILITY_DESCS: usize = 102;
 
     pub const MOVE_NAMES: usize = 118;
     pub const MOVE_DESCS: usize = 117;
@@ -36,6 +35,8 @@ mod garc_files {
     pub const EVOLUTIONS: &str = "0/1/4";
 
     pub const POKEMON_STATS: &str = "0/1/7";
+
+    pub const EN_TEXT: &str = "0/3/2";
 
     pub const ICONS: &str = "0/6/2";
 }
@@ -86,51 +87,20 @@ fn to_id(s: String) -> String {
         .collect()
 }
 
-fn dump_abilities(text_files: &[text::TextFile]) -> Vec<(&str, String)> {
+fn dump_abilities(text_files: &[text::TextFile]) -> Result<Vec<&str>> {
     let ability_names = &text_files[text_ids::ABILITY_NAMES].lines;
-    let ability_descs = &text_files[text_ids::ABILITY_DESCS].lines;
 
-    ability_names
+    Ok(ability_names
         .iter()
-        .zip(ability_descs)
         .skip(1)
-        .map(|(name, desc)| (name.as_str(), desc.replace('\n', " ")))
-        .collect()
-}
-
-const TYPE_COUNT: usize = 18;
-
-fn read_type_chart(rom_path: &Path) -> Result<Vec<u8>> {
-    let code = fs::read(rom_path.join("exefs/code.bin"))?;
-
-    let mut sig = [4u8; TYPE_COUNT];
-    sig[5] = 2;
-    sig[7] = 0;
-    sig[8] = 2;
-
-    let start = code.windows(TYPE_COUNT).position(|w| w == sig).unwrap();
-
-    Ok(code[start..start + TYPE_COUNT * TYPE_COUNT].to_vec())
-}
-
-fn dump_types<'a>(
-    rom_path: &Path,
-    text_files: &'a [text::TextFile],
-) -> Result<Vec<(&'a str, Vec<u8>)>> {
-    let type_names = &text_files[text_ids::TYPE_NAMES].lines;
-    let type_chart = read_type_chart(rom_path)?;
-
-    Ok(type_names
-        .iter()
-        .take(TYPE_COUNT)
-        .enumerate()
-        .map(|(defender, name)| {
-            let damage_taken = (0..TYPE_COUNT)
-                .map(|attacker| type_chart[attacker * TYPE_COUNT + defender] / 2)
-                .collect();
-            (name.as_str(), damage_taken)
-        })
+        .map(|name| name.as_str())
         .collect())
+}
+
+fn dump_types(text_files: &[text::TextFile]) -> Result<Vec<&str>> {
+    let type_names = &text_files[text_ids::TYPE_NAMES].lines;
+
+    Ok(type_names.iter().map(|name| name.as_str()).collect())
 }
 
 fn main() -> Result<()> {
@@ -157,7 +127,11 @@ fn main() -> Result<()> {
     let _ = fs::remove_dir_all(&sprites_dir);
     fs::create_dir_all(out_path)?;
 
-    let mut en_text_file = File::open(rom_path.join(garc_files::BASE_PATH).join("0/3/2"))?;
+    let mut en_text_file = File::open(
+        rom_path
+            .join(garc_files::BASE_PATH)
+            .join(garc_files::EN_TEXT),
+    )?;
     let text_garc_file = GarcFile::read_le(&mut en_text_file)?;
     let text_files = garc::read_files::<text::TextFile>(&text_garc_file);
 
@@ -172,8 +146,8 @@ fn main() -> Result<()> {
 
     let learnsets = learnset::dump_learnsets(rom_path, &text_files, &poke_names)?;
     let moves = moves::dump_moves(rom_path, &text_files)?;
-    let abilities = dump_abilities(&text_files);
-    let types = dump_types(rom_path, &text_files)?;
+    let abilities = dump_abilities(&text_files)?;
+    let types = dump_types(&text_files)?;
 
     let data = json!({
         "pokedex": dex_map.values().collect::<Vec<_>>(),
