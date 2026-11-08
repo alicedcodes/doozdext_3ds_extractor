@@ -19,6 +19,7 @@ mod text_ids {
     pub const SPECIES_NAMES: usize = 60;
 
     pub const ABILITY_NAMES: usize = 101;
+    pub const ABILITY_DESCS: usize = 102;
 
     pub const MOVE_NAMES: usize = 118;
     pub const MOVE_DESCS: usize = 117;
@@ -87,13 +88,15 @@ fn to_id(s: String) -> String {
         .collect()
 }
 
-fn dump_abilities(text_files: &[text::TextFile]) -> Result<Vec<&str>> {
+fn dump_abilities(text_files: &[text::TextFile]) -> Result<Vec<(&str, String)>> {
     let ability_names = &text_files[text_ids::ABILITY_NAMES].lines;
+    let ability_descs = &text_files[text_ids::ABILITY_DESCS].lines;
 
     Ok(ability_names
         .iter()
+        .zip(ability_descs)
         .skip(1)
-        .map(|name| name.as_str())
+        .map(|(name, desc)| (name.as_str(), desc.replace('\n', " ")))
         .collect())
 }
 
