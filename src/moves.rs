@@ -55,12 +55,6 @@ struct BinLinkedMoves {
     files: Vec<FilePtr<u32, MoveStats>>,
 }
 
-#[derive(Serialize)]
-#[serde(untagged)]
-enum MoveJsAccuracy {
-    Number(i32),
-}
-
 #[allow(non_snake_case)]
 #[serde_with::skip_serializing_none]
 #[derive(Serialize)]
@@ -70,7 +64,7 @@ pub struct MoveJs {
     category: u8,
     power: u32,
     zPower: Option<i32>,
-    acc: MoveJsAccuracy,
+    acc: i32,
     pp: u32,
     desc: String,
 }
@@ -94,8 +88,8 @@ pub fn dump_moves(rom_path: &Path, text_files: &[TextFile]) -> Result<Vec<MoveJs
             r#type: cmove.move_type,
             category: cmove.category,
             power: cmove.power as _,
-            zPower: Some(cmove.z_power as i32),
-            acc: MoveJsAccuracy::Number(cmove.accuracy as _),
+            zPower: Some(cmove.z_power as _),
+            acc: cmove.accuracy as _,
             pp: cmove.pp as _,
             desc: move_descs[index].replace('\n', " "),
         })
